@@ -20,6 +20,9 @@ data class AppSettings(
     val password: String = "",
     val notificationsEnabled: Boolean = true,
     val backgroundIntervalMinutes: Int = DEFAULT_INTERVAL_MINUTES,
+    val sort: String = "NEWEST",
+    val group: String = "STATUS",
+    val gridView: Boolean = false,
 ) {
     val isConfigured: Boolean get() = routerUrl.isNotBlank()
 
@@ -44,6 +47,9 @@ class SettingsRepository(private val context: Context) {
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         val INTERVAL = intPreferencesKey("background_interval_minutes")
         val STATUS_SNAPSHOT = stringPreferencesKey("status_snapshot")
+        val SORT = stringPreferencesKey("jobs_sort")
+        val GROUP = stringPreferencesKey("jobs_group")
+        val GRID = booleanPreferencesKey("jobs_grid")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -63,6 +69,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.PASSWORD] = updated.password
             prefs[Keys.NOTIFICATIONS] = updated.notificationsEnabled
             prefs[Keys.INTERVAL] = updated.backgroundIntervalMinutes
+            prefs[Keys.SORT] = updated.sort
+            prefs[Keys.GROUP] = updated.group
+            prefs[Keys.GRID] = updated.gridView
         }
     }
 
@@ -82,5 +91,8 @@ class SettingsRepository(private val context: Context) {
         password = this[Keys.PASSWORD].orEmpty(),
         notificationsEnabled = this[Keys.NOTIFICATIONS] ?: true,
         backgroundIntervalMinutes = this[Keys.INTERVAL] ?: AppSettings.DEFAULT_INTERVAL_MINUTES,
+        sort = this[Keys.SORT] ?: "NEWEST",
+        group = this[Keys.GROUP] ?: "STATUS",
+        gridView = this[Keys.GRID] ?: false,
     )
 }

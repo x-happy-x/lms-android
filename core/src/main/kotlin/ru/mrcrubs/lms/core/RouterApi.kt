@@ -58,10 +58,41 @@ class RouterApi(
     fun cancel(id: String): Job = post("jobs/${encode(id)}/cancel", "{}", Job.serializer())
     fun retry(id: String): Job = post("jobs/${encode(id)}/retry", "{}", Job.serializer())
 
-    fun nodes(enabledOnly: Boolean = true): List<NodeItem> =
+    fun updateJobUrl(id: String, url: String): Job =
+        post("jobs/${encode(id)}/url", mapBody("url" to url), Job.serializer())
+
+    fun moveJob(id: String, request: MoveJobRequest): Job =
+        post("jobs/${encode(id)}/move", json.encodeToString(MoveJobRequest.serializer(), request), Job.serializer())
+
+    fun createNode(request: NodeRequest): NodeItem =
+        post("nodes", json.encodeToString(NodeRequest.serializer(), request), NodeItem.serializer())
+
+    fun updateNode(id: String, request: NodeRequest): NodeItem = execute(
+        request("nodes/${encode(id)}")
+            .put(json.encodeToString(NodeRequest.serializer(), request).toRequestBody(JSON_MEDIA))
+            .build(),
+        NodeItem.serializer(),
+    )
+
+    fun createProfile(request: ProfileRequest): Profile =
+        post("profiles", json.encodeToString(ProfileRequest.serializer(), request), Profile.serializer())
+
+    /** URL of the job's file streamed through the router (Range supported); `inline` for viewing. */
+    fun fileUrl(jobId: String, inline: Boolean = false): String =
+        base.toString() + "api/ui/jobs/${encode(jobId)}/file" + if (inline) "?inline=1" else ""
+
+    /** JPEG thumbnail of a finished photo/video (404 when the node cannot make one). */
+    fun previewUrl(jobId: String): String = base.toString() + "api/ui/jobs/${encode(jobId)}/preview"
+
+    /** Headers to add when another component (player, image loader, DownloadManager) fetches router URLs. */
+    fun authHeaders(): Map<String, String> =
+        if (config.username.isNullOrEmpty()) emptyMap()
+        else mapOf("Authorization" to Credentials.basic(config.username, config.password.orEmpty()))
+
+    fun nodes(enabledOnly: Boolean = false): List<NodeItem> =
         get("nodes?enabled=$enabledOnly", ListSerializer(NodeItem.serializer()))
 
-    fun profiles(enabledOnly: Boolean = true): List<Profile> =
+    fun profiles(enabledOnly: Boolean = false): List<Profile> =
         get("profiles?enabled=$enabledOnly", ListSerializer(Profile.serializer()))
 
     fun storageTargets(nodeId: String, requiredBytes: Long? = null): StorageTargetsResponse {

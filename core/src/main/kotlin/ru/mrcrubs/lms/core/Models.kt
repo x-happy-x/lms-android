@@ -72,7 +72,33 @@ data class Profile(
     val id: String,
     val name: String = "",
     val type: String = "",
+    val extraArgsJson: String? = null,
+    val outputTemplate: String? = null,
     val enabled: Boolean = true,
+)
+
+@Serializable
+data class NodeRequest(
+    val name: String,
+    val baseUrl: String,
+    val clientId: String,
+    val secret: String,
+    val enabled: Boolean = true,
+)
+
+@Serializable
+data class ProfileRequest(
+    val name: String,
+    val type: String,
+    val enabled: Boolean = true,
+    val extraArgsJson: String? = null,
+    val outputTemplate: String? = null,
+)
+
+@Serializable
+data class MoveJobRequest(
+    val targetNodeId: String? = null,
+    val storagePath: String? = null,
 )
 
 @Serializable

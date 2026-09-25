@@ -47,7 +47,7 @@ import ru.mrcrubs.lms.android.ui.factory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
+fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)?) {
     val viewModel: SettingsViewModel = viewModel(factory = factory { SettingsViewModel(container) })
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -56,7 +56,7 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
     }
 
     LaunchedEffect(state.saved) {
-        if (state.saved) onBack()
+        if (state.saved) onBack?.invoke()
     }
 
     Scaffold(
@@ -64,8 +64,10 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Настройки") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        }
                     }
                 },
             )
@@ -170,6 +172,9 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit) {
             }
             Button(onClick = viewModel::save, modifier = Modifier.fillMaxWidth()) {
                 Text("Сохранить")
+            }
+            if (state.saved && onBack == null) {
+                Text("Сохранено", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
