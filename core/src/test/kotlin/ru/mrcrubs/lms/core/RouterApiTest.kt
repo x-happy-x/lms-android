@@ -106,4 +106,36 @@ class RouterApiTest {
         assertEquals("http://host/prefix/", RouterApi.normalizeBaseUrl("http://host/prefix")!!.toString())
         assertNull(RouterApi.normalizeBaseUrl("  "))
     }
+
+    @Test
+    fun nodeProfileMoveAndUrlEndpoints() {
+        repeat(4) { server.enqueue(MockResponse().setBody("""{"id":"x","name":"s1","status":"PAUSED"}""")) }
+        val api = api()
+
+        api.updateNode("n 1", NodeRequest(name = "s1", baseUrl = "http://node", clientId = "router-main", secret = ""))
+        server.takeRequest().let {
+            assertEquals("PUT", it.method)
+            assertEquals("/api/ui/nodes/n%201", it.path)
+            assertTrue(it.body.readUtf8().contains("\"secret\":\"\""))
+        }
+        api.createProfile(ProfileRequest(name = "HD", type = "YTDLP", outputTemplate = "%(title)s.%(ext)s"))
+        assertEquals("/api/ui/profiles", server.takeRequest().path)
+        api.moveJob("j1", MoveJobRequest(targetNodeId = "n2"))
+        server.takeRequest().let {
+            assertEquals("/api/ui/jobs/j1/move", it.path)
+            val body = it.body.readUtf8()
+            assertTrue(body.contains("\"targetNodeId\":\"n2\"") && !body.contains("storagePath"), body)
+        }
+        api.updateJobUrl("j1", "https://new.example/file")
+        assertEquals("/api/ui/jobs/j1/url", server.takeRequest().path)
+    }
+
+    @Test
+    fun fileAndPreviewUrlsWithAuthHeaders() {
+        val api = RouterApi(RouterConfig("http://192.168.1.1:8082/", "me", "pw"))
+        assertEquals("http://192.168.1.1:8082/api/ui/jobs/a%20b/file?inline=1", api.fileUrl("a b", inline = true))
+        assertEquals("http://192.168.1.1:8082/api/ui/jobs/j/preview", api.previewUrl("j"))
+        assertTrue(api.authHeaders().getValue("Authorization").startsWith("Basic "))
+        assertTrue(RouterApi(RouterConfig("router")).authHeaders().isEmpty())
+    }
 }

@@ -89,7 +89,8 @@ class AddDownloadViewModel(
         checkJob = viewModelScope.launch {
             _state.update { it.copy(url = url, checking = true, error = null) }
             try {
-                val (nodes, bestNodeId) = if (LinkExtractor.isMagnet(url)) magnetNodes() else preflightNodes(url)
+                // The router preflights magnets too (TORRENT on online nodes).
+                val (nodes, bestNodeId) = preflightNodes(url)
                 if (nodes.isEmpty()) {
                     _state.update { it.copy(checking = false, error = "На роутере нет включённых нод") }
                     return@launch
@@ -179,25 +180,5 @@ class AddDownloadViewModel(
             )
         }
         return nodes to response.bestNodeId
-    }
-
-    /** The router cannot preflight magnets: offer enabled nodes and the TORRENT type. */
-    private suspend fun magnetNodes(): Pair<List<NodeChoice>, String?> {
-        val nodes = container.router.nodes().filter { it.enabled }.map { node ->
-            NodeChoice(
-                id = node.id,
-                name = node.name.ifBlank { node.id },
-                status = node.status,
-                statusText = node.statusText,
-                pingMs = node.pingMs,
-                supportedTypes = listOf(LinkExtractor.TYPE_TORRENT),
-                recommendedType = LinkExtractor.TYPE_TORRENT,
-                sizeBytes = null,
-                defaultStoragePath = null,
-                error = null,
-            )
-        }
-        val best = nodes.filter { it.status == "online" }.minByOrNull { it.pingMs ?: Long.MAX_VALUE }
-        return nodes to (best ?: nodes.firstOrNull())?.id
     }
 }
