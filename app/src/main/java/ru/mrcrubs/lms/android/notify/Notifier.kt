@@ -12,6 +12,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import ru.mrcrubs.lms.android.LinkReceiverActivity
 import ru.mrcrubs.lms.android.MainActivity
 import ru.mrcrubs.lms.android.R
 import ru.mrcrubs.lms.core.Format
@@ -68,6 +69,31 @@ class Notifier(private val context: Context) {
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(job.id.hashCode(), notification)
+    }
+
+    /** A link could not be added right away: tapping opens the add screen with it. */
+    @SuppressLint("MissingPermission") // checked in canNotify()
+    fun showAddFailed(link: String, reason: String) {
+        if (!canNotify()) return
+        val open = PendingIntent.getActivity(
+            context,
+            link.hashCode(),
+            Intent(context, MainActivity::class.java)
+                .setAction(LinkReceiverActivity.ACTION_ADD_LINK)
+                .putExtra(LinkReceiverActivity.EXTRA_LINK, link)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val text = "$reason. Нажмите, чтобы выбрать ноду вручную."
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Не удалось добавить ссылку")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$link\n$text"))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(link.hashCode(), notification)
     }
 
     companion object {

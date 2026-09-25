@@ -81,6 +81,7 @@ fun JobsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var editUrl by remember { mutableStateOf<Job?>(null) }
     var move by remember { mutableStateOf<Job?>(null) }
+    var speed by remember { mutableStateOf<Job?>(null) }
     var cancel by remember { mutableStateOf<Job?>(null) }
 
     val callbacks = remember(viewModel) {
@@ -93,6 +94,7 @@ fun JobsScreen(
             open = onOpenMedia,
             editUrl = { editUrl = it },
             move = { move = it },
+            speed = { speed = it },
         )
     }
 
@@ -141,6 +143,9 @@ fun JobsScreen(
     editUrl?.let { job -> EditUrlDialog(job, onDismiss = { editUrl = null }) { url -> viewModel.updateUrl(job, url) { editUrl = null } } }
     move?.let { job ->
         MoveDialog(job, state.nodes, onDismiss = { move = null }) { nodeId, path -> viewModel.move(job, nodeId, path) { move = null } }
+    }
+    speed?.let { job ->
+        SpeedDialog(job, onDismiss = { speed = null }) { limit -> viewModel.setSpeedLimit(job, limit) { speed = null } }
     }
     cancel?.let { job -> CancelDialog(job, onDismiss = { cancel = null }) { viewModel.cancel(job); cancel = null } }
 }

@@ -5,6 +5,8 @@ import kotlinx.coroutines.withContext
 import ru.mrcrubs.lms.core.ApiException
 import ru.mrcrubs.lms.core.CreateJobRequest
 import ru.mrcrubs.lms.core.Job
+import ru.mrcrubs.lms.core.JobPlan
+import ru.mrcrubs.lms.core.JobPlanner
 import ru.mrcrubs.lms.core.MoveJobRequest
 import ru.mrcrubs.lms.core.NodeItem
 import ru.mrcrubs.lms.core.NodeRequest
@@ -44,6 +46,22 @@ class RouterRepository(private val settings: SettingsRepository) {
     suspend fun storageTargets(nodeId: String, requiredBytes: Long?): StorageTargetsResponse =
         call { storageTargets(nodeId, requiredBytes) }
     suspend fun createJob(request: CreateJobRequest): Job = call { createJob(request) }
+    suspend fun setSpeedLimit(id: String, maxSpeedBytes: Long?): Job = call { setSpeedLimit(id, maxSpeedBytes) }
+
+    /** Adds a link without the add screen: router preflight, then the planned node and type. */
+    suspend fun addQuickly(url: String, maxSpeedBytes: Long?): Pair<Job, JobPlan> = call {
+        val plan = JobPlanner.plan(preflight(url), url)
+        val job = createJob(
+            CreateJobRequest(
+                type = plan.type,
+                url = url,
+                storagePath = plan.storagePath,
+                nodeId = plan.nodeId,
+                maxSpeedBytes = maxSpeedBytes?.takeIf { it > 0 },
+            ),
+        )
+        job to plan
+    }
 
     /** Checks a not-yet-saved configuration; returns the router version. */
     suspend fun testConnection(config: RouterConfig): String = withContext(Dispatchers.IO) {

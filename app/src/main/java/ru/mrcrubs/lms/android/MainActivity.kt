@@ -53,7 +53,6 @@ import ru.mrcrubs.lms.android.ui.nodes.NodesScreen
 import ru.mrcrubs.lms.android.ui.profiles.ProfilesScreen
 import ru.mrcrubs.lms.android.ui.settings.SettingsScreen
 import ru.mrcrubs.lms.android.ui.theme.LmsTheme
-import ru.mrcrubs.lms.core.LinkExtractor
 
 /** App-wide dependencies for composables that need them (image URLs, storage lookups). */
 val LocalContainer = staticCompositionLocalOf<AppContainer> { error("AppContainer is not provided") }
@@ -80,15 +79,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        // Links from other apps arrive through LinkReceiverActivity; ACTION_ADD_LINK carries them here.
         val link = when (intent?.action) {
-            Intent.ACTION_SEND -> LinkExtractor.extract(
-                listOfNotNull(
-                    intent.getStringExtra(Intent.EXTRA_TEXT),
-                    intent.getStringExtra(Intent.EXTRA_SUBJECT),
-                ).joinToString(" "),
-            )
-            Intent.ACTION_VIEW -> intent.dataString?.takeIf { LinkExtractor.isSupportedUrl(it) }
-            else -> null
+            LinkReceiverActivity.ACTION_ADD_LINK -> intent.getStringExtra(LinkReceiverActivity.EXTRA_LINK)
+            else -> LinkReceiverActivity.linkFrom(intent)
         }
         if (link != null) container.incomingLinks.value = link
     }

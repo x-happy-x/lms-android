@@ -51,6 +51,8 @@ object LinkExtractor {
     /** Best guess before (or without) a router preflight. */
     fun suggestType(url: String): String {
         if (isTorrentLink(url)) return TYPE_TORRENT
+        val path = url.substringBefore('?').substringBefore('#').lowercase()
+        if (path.endsWith(".m3u8") || path.endsWith(".mpd")) return TYPE_YTDLP // HLS/DASH streams
         val host = hostOf(url) ?: return TYPE_DIRECT
         return if (VIDEO_HOSTS.any { host == it || host.endsWith(".$it") }) TYPE_YTDLP else TYPE_DIRECT
     }

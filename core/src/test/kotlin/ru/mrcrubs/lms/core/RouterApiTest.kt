@@ -64,6 +64,27 @@ class RouterApiTest {
     }
 
     @Test
+    fun speedLimitIsSetAndCleared() {
+        server.enqueue(MockResponse().setBody("""{"id":"1","status":"RUNNING","maxSpeedBytes":1048576}"""))
+        server.enqueue(MockResponse().setBody("""{"id":"1","status":"RUNNING"}"""))
+
+        assertEquals(1_048_576L, api().setSpeedLimit("1", 1_048_576L).maxSpeedBytes)
+        assertNull(api().setSpeedLimit("1", null).maxSpeedBytes)
+
+        val set = server.takeRequest()
+        assertEquals("/api/ui/jobs/1/speed", set.path)
+        assertEquals("""{"maxSpeedBytes":1048576}""", set.body.readUtf8())
+        assertEquals("""{"maxSpeedBytes":null}""", server.takeRequest().body.readUtf8())
+    }
+
+    @Test
+    fun createJobCarriesSpeedLimit() {
+        server.enqueue(MockResponse().setBody("""{"id":"9","status":"QUEUED"}"""))
+        api().createJob(CreateJobRequest(type = "DIRECT", url = "https://x.ru/a.zip", maxSpeedBytes = 5_242_880L))
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"maxSpeedBytes\":5242880"))
+    }
+
+    @Test
     fun actionsUseJobPath() {
         server.enqueue(MockResponse().setBody("""{"id":"a b","status":"PAUSED"}"""))
         api().pause("a b")

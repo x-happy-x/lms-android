@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
@@ -54,6 +55,7 @@ import ru.mrcrubs.lms.core.Format
 import ru.mrcrubs.lms.core.Job
 import ru.mrcrubs.lms.core.JobStatus
 import ru.mrcrubs.lms.core.NodeItem
+import ru.mrcrubs.lms.core.SpeedLimits
 import ru.mrcrubs.lms.core.hasOutput
 import ru.mrcrubs.lms.core.isViewableMedia
 
@@ -67,6 +69,7 @@ data class JobCallbacks(
     val open: (Job) -> Unit,
     val editUrl: (Job) -> Unit,
     val move: (Job) -> Unit,
+    val speed: (Job) -> Unit,
 )
 
 @Composable
@@ -106,6 +109,7 @@ private fun details(job: Job, node: NodeItem?): String {
     } else {
         (job.outputSizeBytes ?: total)?.let { parts += Format.bytes(it) }
     }
+    if (job.status.isActive) job.maxSpeedBytes?.takeIf { it > 0 }?.let { parts += "до ${SpeedLimits.label(it)}" }
     parts += typeLabel(job.type)
     node?.let { parts += it.name }
     return parts.joinToString(" · ")
@@ -144,6 +148,10 @@ private fun JobMenu(job: Job, callbacks: JobCallbacks) {
             if (job.hasOutput) MenuAction("Скачать на телефон", Icons.Filled.Download, close) { callbacks.download(job) }
             if (job.isViewableMedia) MenuAction("Открыть", Icons.Filled.Visibility, close) { callbacks.open(job) }
             if (job.remoteJobId != null) MenuAction("Переместить", Icons.Filled.SwapHoriz, close) { callbacks.move(job) }
+            if (job.status.isActive) {
+                val label = job.maxSpeedBytes?.takeIf { it > 0 }?.let { "Скорость: ${SpeedLimits.label(it)}" } ?: "Ограничить скорость"
+                MenuAction(label, Icons.Filled.Speed, close) { callbacks.speed(job) }
+            }
             if (job.status != JobStatus.DONE) MenuAction("Изменить ссылку", Icons.Filled.Edit, close) { callbacks.editUrl(job) }
             MenuAction("Копировать ссылку", Icons.Filled.ContentCopy, close) { clipboard.setText(AnnotatedString(job.url)) }
             if (job.canCancel) MenuAction("Отменить", Icons.Filled.Close, close) { callbacks.cancel(job) }

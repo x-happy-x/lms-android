@@ -38,6 +38,10 @@ data class AddUiState(
     val storagePath: String = "",
     val storageTargets: List<StorageTarget> = emptyList(),
     val startImmediately: Boolean = true,
+    /** Bytes/s, null = unlimited; starts from the default in the settings. */
+    val maxSpeedBytes: Long? = null,
+    /** Set once the default limit is read, so the picker starts from it. */
+    val speedDefaultLoaded: Boolean = false,
     val submitting: Boolean = false,
     val error: String? = null,
     val created: Boolean = false,
@@ -65,6 +69,10 @@ class AddDownloadViewModel(
     private var autoStoragePath: String = ""
 
     init {
+        viewModelScope.launch {
+            val limit = container.settings.current().defaultSpeedLimit
+            _state.update { it.copy(maxSpeedBytes = limit, speedDefaultLoaded = true) }
+        }
         if (!initialUrl.isNullOrBlank()) check()
     }
 
@@ -78,6 +86,7 @@ class AddDownloadViewModel(
     fun setType(value: String) = _state.update { it.copy(type = value) }
     fun setStoragePath(value: String) = _state.update { it.copy(storagePath = value) }
     fun setStartImmediately(value: Boolean) = _state.update { it.copy(startImmediately = value) }
+    fun setSpeedLimit(value: Long?) = _state.update { it.copy(maxSpeedBytes = value) }
 
     fun check() {
         val url = LinkExtractor.extract(_state.value.url) ?: _state.value.url.trim()
@@ -152,6 +161,7 @@ class AddDownloadViewModel(
                         storagePath = s.storagePath.trim().ifBlank { null },
                         nodeId = s.selectedNodeId,
                         startImmediately = s.startImmediately,
+                        maxSpeedBytes = s.maxSpeedBytes?.takeIf { it > 0 },
                     ),
                 )
                 _state.update { it.copy(submitting = false, created = true) }

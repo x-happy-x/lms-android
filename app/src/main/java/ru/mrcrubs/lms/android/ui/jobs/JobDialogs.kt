@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ru.mrcrubs.lms.android.ui.common.SpeedLimitPicker
 import ru.mrcrubs.lms.core.Job
 import ru.mrcrubs.lms.core.NodeItem
 
@@ -68,6 +69,27 @@ fun MoveDialog(job: Job, nodes: List<NodeItem>, onDismiss: () -> Unit, onMove: (
             }
         },
         confirmButton = { TextButton(onClick = { onMove(nodeId, path) }) { Text("Переместить") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
+}
+
+@Composable
+fun SpeedDialog(job: Job, onDismiss: () -> Unit, onSave: (Long?) -> Unit) {
+    var limit by remember { mutableStateOf(job.maxSpeedBytes?.takeIf { it > 0 }) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ограничение скорости") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(job.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                SpeedLimitPicker(value = limit, onChange = { limit = it })
+                Text(
+                    "HTTP-загрузки меняют скорость сразу, остальные перезапускаются и продолжают с того же места.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(limit) }) { Text("Применить") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )
 }

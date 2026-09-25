@@ -25,33 +25,59 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- Links from other apps; invisible, hands the link to MainActivity or adds it right away. -->
+        <activity
+            android:name=".LinkReceiverActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:label="@string/share_target_label"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
 
             <!-- "Share" a link from a browser, YouTube, messengers. -->
-            <intent-filter android:label="@string/share_target_label">
+            <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
 
+            <!-- "Open with": any web link (shown in the app chooser next to browsers). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+
+            <!-- Web links opened with a media or torrent type (players, file managers, download lists). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/x-bittorrent" />
+            </intent-filter>
+
             <!-- magnet: links. -->
-            <intent-filter android:label="@string/share_target_label">
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="magnet" />
             </intent-filter>
 
-            <!-- http(s) links to .torrent files. -->
-            <intent-filter android:label="@string/share_target_label">
-                <action android:name="android.intent.action.VIEW" />
+            <!-- "Скачать через LMS" in the text selection menu. -->
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-                <data android:host="*" />
-                <data android:pathPattern=".*\\.torrent" />
-                <data android:pathPattern=".*\\..*\\.torrent" />
-                <data android:pathPattern=".*\\..*\\..*\\.torrent" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
     </application>
