@@ -12,15 +12,29 @@ android {
         applicationId = "ru.mrcrubs.lms"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI passes -PversionCode=<run number> so every published build installs over the previous one.
+        val buildNumber = providers.gradleProperty("versionCode").orNull?.toIntOrNull() ?: 1
+        versionCode = buildNumber
+        versionName = "0.1.$buildNumber"
+    }
+
+    // Release key comes from the environment (CI secrets); without it release falls back to the debug key.
+    val releaseKeystore = System.getenv("LMS_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("LMS_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("LMS_KEY_ALIAS")
+                keyPassword = System.getenv("LMS_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key until a release keystore is set up.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
