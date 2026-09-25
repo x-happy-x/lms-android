@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.mrcrubs.lms.android.AppContainer
+import ru.mrcrubs.lms.android.ui.common.SpeedLimitPicker
 import ru.mrcrubs.lms.android.ui.factory
 import ru.mrcrubs.lms.core.Format
 import ru.mrcrubs.lms.core.LinkExtractor
@@ -171,6 +172,11 @@ fun AddDownloadScreen(
 
                 SectionTitle("Папка на ноде")
                 StoragePathField(state, viewModel::setStoragePath)
+
+                SectionTitle("Скорость")
+                if (state.speedDefaultLoaded) {
+                    SpeedLimitPicker(value = state.maxSpeedBytes, onChange = viewModel::setSpeedLimit)
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Начать сразу", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)

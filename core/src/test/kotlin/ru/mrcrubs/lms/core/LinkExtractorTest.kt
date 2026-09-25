@@ -34,6 +34,7 @@ class LinkExtractorTest {
         assertEquals("TORRENT", LinkExtractor.suggestType("magnet:?xt=urn:btih:abc"))
         assertEquals("TORRENT", LinkExtractor.suggestType("https://tracker.example/dl/file.torrent?key=1"))
         assertEquals("YTDLP", LinkExtractor.suggestType("https://www.youtube.com/watch?v=abc"))
+        assertEquals("YTDLP", LinkExtractor.suggestType("https://cdn.example.com/live/master.m3u8?token=1"))
         assertEquals("YTDLP", LinkExtractor.suggestType("https://m.vk.com/video-1_2"))
         assertEquals("DIRECT", LinkExtractor.suggestType("https://example.com/archive.tar.gz"))
     }

@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +24,10 @@ data class AppSettings(
     val sort: String = "NEWEST",
     val group: String = "STATUS",
     val gridView: Boolean = false,
+    /** Links opened or shared into the app are added right away (best node, suggested type). */
+    val quickAdd: Boolean = false,
+    /** Limit for new downloads in bytes/s; null = unlimited. */
+    val defaultSpeedLimit: Long? = null,
 ) {
     val isConfigured: Boolean get() = routerUrl.isNotBlank()
 
@@ -50,6 +55,8 @@ class SettingsRepository(private val context: Context) {
         val SORT = stringPreferencesKey("jobs_sort")
         val GROUP = stringPreferencesKey("jobs_group")
         val GRID = booleanPreferencesKey("jobs_grid")
+        val QUICK_ADD = booleanPreferencesKey("quick_add")
+        val SPEED_LIMIT = longPreferencesKey("default_speed_limit")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -72,6 +79,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SORT] = updated.sort
             prefs[Keys.GROUP] = updated.group
             prefs[Keys.GRID] = updated.gridView
+            prefs[Keys.QUICK_ADD] = updated.quickAdd
+            val limit = updated.defaultSpeedLimit?.takeIf { it > 0 }
+            if (limit == null) prefs.remove(Keys.SPEED_LIMIT) else prefs[Keys.SPEED_LIMIT] = limit
         }
     }
 
@@ -94,5 +104,7 @@ class SettingsRepository(private val context: Context) {
         sort = this[Keys.SORT] ?: "NEWEST",
         group = this[Keys.GROUP] ?: "STATUS",
         gridView = this[Keys.GRID] ?: false,
+        quickAdd = this[Keys.QUICK_ADD] ?: false,
+        defaultSpeedLimit = this[Keys.SPEED_LIMIT],
     )
 }

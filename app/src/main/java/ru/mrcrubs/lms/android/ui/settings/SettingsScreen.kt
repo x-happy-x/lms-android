@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.mrcrubs.lms.android.AppContainer
 import ru.mrcrubs.lms.android.data.AppSettings
+import ru.mrcrubs.lms.android.ui.common.SpeedLimitPicker
 import ru.mrcrubs.lms.android.ui.factory
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,6 +167,24 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)?) {
                     }
                 }
             }
+
+            Text("Загрузки", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Добавлять без подтверждения", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Ссылки из «Поделиться» и «Открыть с помощью» сразу уходят на лучшую ноду, без экрана добавления.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = form.quickAdd, onCheckedChange = { value -> viewModel.edit { it.copy(quickAdd = value) } })
+            }
+            Text("Ограничение скорости для новых загрузок", style = MaterialTheme.typography.bodyMedium)
+            SpeedLimitPicker(
+                value = form.defaultSpeedLimit,
+                onChange = { limit -> viewModel.edit { it.copy(defaultSpeedLimit = limit) } },
+            )
 
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)

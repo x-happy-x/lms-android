@@ -128,6 +128,9 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     fun updateUrl(job: Job, url: String, onDone: () -> Unit) =
         jobAction(job, onDone) { container.router.updateJobUrl(it, url.trim()) }
 
+    fun setSpeedLimit(job: Job, maxSpeedBytes: Long?, onDone: () -> Unit) =
+        jobAction(job, onDone) { container.router.setSpeedLimit(it, maxSpeedBytes) }
+
     fun move(job: Job, nodeId: String?, storagePath: String?, onDone: () -> Unit) = jobAction(job, onDone) {
         container.router.moveJob(it, MoveJobRequest(targetNodeId = nodeId, storagePath = storagePath?.trim()?.ifBlank { null }))
     }

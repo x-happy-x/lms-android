@@ -24,7 +24,7 @@ import ru.mrcrubs.lms.core.RouterApi
 import ru.mrcrubs.lms.core.RouterConfig
 
 /** Manual dependency container; the app is small enough not to need a DI framework. */
-class AppContainer(app: Application, scope: CoroutineScope) {
+class AppContainer(app: Application, val scope: CoroutineScope) {
     val settings = SettingsRepository(app)
     val router = RouterRepository(settings)
     val notifier = Notifier(app)
@@ -39,7 +39,7 @@ class AppContainer(app: Application, scope: CoroutineScope) {
 
     fun api(): RouterApi? = routerConfig.value?.let(router::api)
 
-    /** Links received via "Share" or magnet intents, consumed by the navigation host. */
+    /** Links received via "Share", "Open with" or selected text, consumed by the navigation host. */
     val incomingLinks = MutableStateFlow<String?>(null)
 }
 

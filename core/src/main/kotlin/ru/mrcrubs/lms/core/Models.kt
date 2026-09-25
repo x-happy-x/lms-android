@@ -38,6 +38,8 @@ data class Job(
     val outputPath: String? = null,
     val outputSizeBytes: Long? = null,
     val errorText: String? = null,
+    /** Download limit in bytes/s; null = unlimited. */
+    val maxSpeedBytes: Long? = null,
 ) {
     /** Human-friendly title: output file name, else the last URL segment, else the URL. */
     val title: String
@@ -159,4 +161,6 @@ data class CreateJobRequest(
     val profileId: String? = null,
     val nodeId: String? = null,
     val startImmediately: Boolean = true,
+    /** Download limit in bytes/s; null = unlimited. */
+    val maxSpeedBytes: Long? = null,
 )

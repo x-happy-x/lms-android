@@ -61,6 +61,10 @@ class RouterApi(
     fun updateJobUrl(id: String, url: String): Job =
         post("jobs/${encode(id)}/url", mapBody("url" to url), Job.serializer())
 
+    /** Sets or clears (null) the job's download limit; running jobs pick it up on the node. */
+    fun setSpeedLimit(id: String, maxSpeedBytes: Long?): Job =
+        post("jobs/${encode(id)}/speed", speedBody(maxSpeedBytes), Job.serializer())
+
     fun moveJob(id: String, request: MoveJobRequest): Job =
         post("jobs/${encode(id)}/move", json.encodeToString(MoveJobRequest.serializer(), request), Job.serializer())
 
@@ -144,6 +148,12 @@ class RouterApi(
         json.encodeToString(JsonObject.serializer(), JsonObject(pairs.associate { (k, v) ->
             k to kotlinx.serialization.json.JsonPrimitive(v)
         }))
+
+    private fun speedBody(maxSpeedBytes: Long?): String =
+        json.encodeToString(
+            JsonObject.serializer(),
+            JsonObject(mapOf("maxSpeedBytes" to kotlinx.serialization.json.JsonPrimitive(maxSpeedBytes?.takeIf { it > 0 }))),
+        )
 
     private fun encode(segment: String): String =
         java.net.URLEncoder.encode(segment, Charsets.UTF_8).replace("+", "%20")
