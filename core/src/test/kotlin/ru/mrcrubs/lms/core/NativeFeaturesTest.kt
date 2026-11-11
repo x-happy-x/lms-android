@@ -34,10 +34,13 @@ class NativeFeaturesTest {
         assertEquals(72,job.playlist?.entryCount)
         assertEquals(720,job.ytdlpOptions?.maxHeight)
         assertEquals(30.0,job.percent)
+        assertEquals("Текущий ролик · 30%",Format.jobProgress(job))
+        assertEquals("30%",Format.jobProgress(job.copy(ytdlpOptions=YtdlpOptions(playlist=false))))
         assertEquals(1,job.playlist?.entries?.size)
         val done=job.copy(status=JobStatus.DONE,outputPath="/downloads/playlist-p")
         assertFalse(done.isViewableMedia)
         assertEquals("Course.zip",done.downloadFileName)
+        assertEquals("100%",Format.jobProgress(done))
     }
     @Test fun filesUseEncodedRootAndRelativePathAndFixedMutationEndpoints() {
         MockWebServer().use { server->

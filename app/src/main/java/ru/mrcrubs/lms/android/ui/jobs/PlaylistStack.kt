@@ -41,9 +41,9 @@ import ru.mrcrubs.lms.core.*
                     Column(Modifier.weight(1f)){Text(snapshot?.title ?: "Плейлист",style=MaterialTheme.typography.titleMedium,maxLines=2);Text("${snapshot?.entryCount?.let{"$it роликов"} ?: entries.size.takeIf{it>0}?.let{"$it роликов"} ?: if(whole)"Число роликов уточняется" else "${jobs.size} роликов"} · ${if(whole)"весь плейлист" else "выбранные"}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                     Icon(if(expanded)Icons.Default.ExpandLess else Icons.Default.ExpandMore,if(expanded)"Свернуть плейлист" else "Развернуть плейлист")
                 }
-                val known=jobs.mapNotNull{it.percent ?: if(it.status==JobStatus.DONE)100.0 else null}
+                val known=jobs.mapNotNull{if(it.status==JobStatus.DONE)100.0 else it.percent}
                 if(known.size==jobs.size)LinearProgressIndicator(progress={(known.average()/100).toFloat().coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())
-                Text(if(whole)"Общий прогресс · ${Format.status(first.status)}${first.percent?.let{" · ${Format.percent(it)}"}.orEmpty()}" else "Готово ${jobs.count{it.status==JobStatus.DONE}} из ${jobs.size}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if(whole)if(first.status==JobStatus.DONE)"Плейлист завершён" else "${Format.jobProgress(first) ?: "Плейлист"} · ${Format.status(first.status)}" else "Готово ${jobs.count{it.status==JobStatus.DONE}} из ${jobs.size}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 AnimatedVisibility(expanded) {
                     Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         jobs.forEach{job->JobRow(job,job.nodeId?.let(nodes::get),job.id in busyIds,callbacks,entries.firstOrNull{it.url==job.url}?.title ?: job.title)}
@@ -53,7 +53,7 @@ import ru.mrcrubs.lms.core.*
                             error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
                             entries.take(shown).forEach{entry->MediaEntryCard(entry,first.nodeId,first.ytdlpOptions?.maxHeight,networkRouteId=first.networkRouteId)}
                             if(shown<entries.size)TextButton(onClick={shown+=12}){Text("Показать ещё ${minOf(12,entries.size-shown)}")}
-                            Text("Индивидуальный прогресс роликов появится только при отдельных заданиях.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Процент относится к текущему ролику и сбрасывается при переходе к следующему. Статусы отдельных роликов доступны только для отдельных заданий.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

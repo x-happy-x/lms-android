@@ -175,8 +175,11 @@ fun JobRow(job: Job, node: NodeItem?, busy: Boolean, callbacks: JobCallbacks, di
                 Text(displayTitle, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusBadge(job.status)
-                    if (job.status.isActive) job.percent?.let { Text(Format.percent(it).orEmpty(), style = MaterialTheme.typography.labelLarge) }
+                    if (job.status.isActive && job.ytdlpOptions?.playlist != true) job.percent?.let { Text(Format.jobProgress(job).orEmpty(), style = MaterialTheme.typography.labelLarge) }
                     Text(kind.label, style = MaterialTheme.typography.labelMedium, color = kind.color())
+                }
+                if (job.status.isActive && job.ytdlpOptions?.playlist == true) Format.jobProgress(job)?.let {
+                    Text(it,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
                 }
                 if (job.status.isActive) {
                     val percent = job.percent
@@ -220,7 +223,10 @@ fun JobTile(job: Job, busy: Boolean, callbacks: JobCallbacks) {
             Text(job.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusBadge(job.status)
-                if (job.status.isActive) job.percent?.let { Text(Format.percent(it).orEmpty(), style = MaterialTheme.typography.labelMedium) }
+                if (job.status.isActive && job.ytdlpOptions?.playlist != true) job.percent?.let { Text(Format.jobProgress(job).orEmpty(), style = MaterialTheme.typography.labelMedium) }
+            }
+            if (job.status.isActive && job.ytdlpOptions?.playlist == true) Format.jobProgress(job)?.let {
+                Text(it,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             }
             if (job.status.isActive) {
                 job.percent?.let { percent ->
