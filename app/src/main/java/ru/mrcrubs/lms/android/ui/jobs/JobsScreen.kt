@@ -83,6 +83,7 @@ fun JobsScreen(
     var move by remember { mutableStateOf<Job?>(null) }
     var speed by remember { mutableStateOf<Job?>(null) }
     var cancel by remember { mutableStateOf<Job?>(null) }
+    var network by remember { mutableStateOf<Job?>(null) }
 
     val callbacks = remember(viewModel,state.canEdit) {
         JobCallbacks(
@@ -95,6 +96,7 @@ fun JobsScreen(
             editUrl = { editUrl = it },
             move = { move = it },
             speed = { speed = it },
+            network = { network = it },
         )
     }
 
@@ -148,6 +150,12 @@ fun JobsScreen(
         SpeedDialog(job, onDismiss = { speed = null }) { limit -> viewModel.setSpeedLimit(job, limit) { speed = null } }
     }
     cancel?.let { job -> CancelDialog(job, onDismiss = { cancel = null }) { viewModel.cancel(job); cancel = null } }
+    network?.let { selected ->
+        val job = state.jobs.firstOrNull { it.id == selected.id } ?: selected
+        NetworkRouteDialog(job, canEdit = state.canEdit, busy = job.id in state.busyJobIds, onDismiss = { network = null }) { routeId, result ->
+            viewModel.setNetworkRoute(job, routeId, result)
+        }
+    }
 }
 
 @Composable
