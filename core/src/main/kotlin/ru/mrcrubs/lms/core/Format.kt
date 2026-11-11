@@ -34,6 +34,12 @@ object Format {
         }
     }
 
+    /** yt-dlp resets percent between files in a whole-playlist job. */
+    fun jobProgress(job: Job): String? {
+        if (job.status == JobStatus.DONE) return percent(100.0)
+        return percent(job.percent)?.let { if (job.ytdlpOptions?.playlist == true) "Текущий ролик · $it" else it }
+    }
+
     fun percent(value: Double?): String? =
         value?.let { String.format(Locale.ROOT, if (it >= 10 || it == 0.0) "%.0f%%" else "%.1f%%", it) }
 

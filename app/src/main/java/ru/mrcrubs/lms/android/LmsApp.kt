@@ -26,6 +26,11 @@ import ru.mrcrubs.lms.core.RouterConfig
 /** Manual dependency container; the app is small enough not to need a DI framework. */
 class AppContainer(app: Application, val scope: CoroutineScope) {
     val settings = SettingsRepository(app)
+    val account = ru.mrcrubs.lms.android.data.NativeAccount(settings)
+    val accountResult = MutableStateFlow<String?>(null)
+    fun completeAccount(uri: String) { scope.launch {
+        accountResult.value = try { "Вход выполнен: ${account.complete(uri)}" } catch (error: Exception) { error.message ?: "Не удалось войти" }
+    } }
     val router = RouterRepository(settings)
     val notifier = Notifier(app)
     val monitor = JobMonitor(settings, notifier)
@@ -67,7 +72,7 @@ class LmsApp : Application(), ImageLoaderFactory {
         .okHttpClient {
             OkHttpClient.Builder()
                 .addInterceptor { chain ->
-                    val headers = container.api()?.authHeaders().orEmpty()
+                    val headers = container.api()?.headersFor(chain.request().url.toString()).orEmpty()
                     val request = chain.request().newBuilder().apply {
                         headers.forEach { (name, value) -> header(name, value) }
                     }.build()

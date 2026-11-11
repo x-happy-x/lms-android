@@ -61,6 +61,7 @@ import ru.mrcrubs.lms.core.isViewableMedia
 
 /** Callbacks for everything a job card can do. */
 data class JobCallbacks(
+    val canEdit: Boolean = true,
     val pause: (Job) -> Unit,
     val resume: (Job) -> Unit,
     val retry: (Job) -> Unit,
@@ -118,9 +119,9 @@ private fun details(job: Job, node: NodeItem?): String {
 @Composable
 private fun QuickActions(job: Job, callbacks: JobCallbacks) {
     when {
-        job.canPause -> FilledTonalIconButton(onClick = { callbacks.pause(job) }) { Icon(Icons.Filled.Pause, "Пауза") }
-        job.canResume -> FilledTonalIconButton(onClick = { callbacks.resume(job) }) { Icon(Icons.Filled.PlayArrow, "Продолжить") }
-        job.canRetry -> IconButton(onClick = { callbacks.retry(job) }) { Icon(Icons.Filled.Refresh, "Повторить") }
+        callbacks.canEdit && job.canPause -> FilledTonalIconButton(onClick = { callbacks.pause(job) }) { Icon(Icons.Filled.Pause, "Пауза") }
+        callbacks.canEdit && job.canResume -> FilledTonalIconButton(onClick = { callbacks.resume(job) }) { Icon(Icons.Filled.PlayArrow, "Продолжить") }
+        callbacks.canEdit && job.canRetry -> IconButton(onClick = { callbacks.retry(job) }) { Icon(Icons.Filled.Refresh, "Повторить") }
         job.hasOutput -> FilledTonalIconButton(onClick = { callbacks.download(job) }) { Icon(Icons.Filled.Download, "Скачать на телефон") }
     }
 }
@@ -147,35 +148,38 @@ private fun JobMenu(job: Job, callbacks: JobCallbacks) {
             val close = { open = false }
             if (job.hasOutput) MenuAction("Скачать на телефон", Icons.Filled.Download, close) { callbacks.download(job) }
             if (job.isViewableMedia) MenuAction("Открыть", Icons.Filled.Visibility, close) { callbacks.open(job) }
-            if (job.remoteJobId != null) MenuAction("Переместить", Icons.Filled.SwapHoriz, close) { callbacks.move(job) }
-            if (job.status.isActive) {
+            if (callbacks.canEdit && job.remoteJobId != null) MenuAction("Переместить", Icons.Filled.SwapHoriz, close) { callbacks.move(job) }
+            if (callbacks.canEdit && job.status.isActive) {
                 val label = job.maxSpeedBytes?.takeIf { it > 0 }?.let { "Скорость: ${SpeedLimits.label(it)}" } ?: "Ограничить скорость"
                 MenuAction(label, Icons.Filled.Speed, close) { callbacks.speed(job) }
             }
-            if (job.status != JobStatus.DONE) MenuAction("Изменить ссылку", Icons.Filled.Edit, close) { callbacks.editUrl(job) }
+            if (callbacks.canEdit && job.status != JobStatus.DONE) MenuAction("Изменить ссылку", Icons.Filled.Edit, close) { callbacks.editUrl(job) }
             MenuAction("Копировать ссылку", Icons.Filled.ContentCopy, close) { clipboard.setText(AnnotatedString(job.url)) }
-            if (job.canCancel) MenuAction("Отменить", Icons.Filled.Close, close) { callbacks.cancel(job) }
+            if (callbacks.canEdit && job.canCancel) MenuAction("Отменить", Icons.Filled.Close, close) { callbacks.cancel(job) }
         }
     }
 }
 
 @Composable
-fun JobRow(job: Job, node: NodeItem?, busy: Boolean, callbacks: JobCallbacks) {
+fun JobRow(job: Job, node: NodeItem?, busy: Boolean, callbacks: JobCallbacks, displayTitle: String = job.title) {
     val kind = FileKind.of(job)
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors=androidx.compose.material3.CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(
             Modifier.padding(start = 12.dp, top = 12.dp, end = 4.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val thumbModifier = if (job.isViewableMedia) Modifier.clickable { callbacks.open(job) } else Modifier
-            JobThumb(job, size = 52.dp, modifier = thumbModifier)
+            JobThumb(job, size = 64.dp, modifier = thumbModifier)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(job.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(displayTitle, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusBadge(job.status)
-                    if (job.status.isActive) job.percent?.let { Text(Format.percent(it).orEmpty(), style = MaterialTheme.typography.labelLarge) }
+                    if (job.status.isActive && job.ytdlpOptions?.playlist != true) job.percent?.let { Text(Format.jobProgress(job).orEmpty(), style = MaterialTheme.typography.labelLarge) }
                     Text(kind.label, style = MaterialTheme.typography.labelMedium, color = kind.color())
+                }
+                if (job.status.isActive && job.ytdlpOptions?.playlist == true) Format.jobProgress(job)?.let {
+                    Text(it,style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
                 }
                 if (job.status.isActive) {
                     val percent = job.percent
@@ -185,6 +189,7 @@ fun JobRow(job: Job, node: NodeItem?, busy: Boolean, callbacks: JobCallbacks) {
                         LinearProgressIndicator(Modifier.fillMaxWidth().padding(end = 8.dp))
                     }
                 }
+                job.networkRouteLabel?.let { Text("Маршрут: $it",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary) }
                 Text(details(job, node), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val note = if (job.status == JobStatus.ERROR) job.errorText ?: job.message else null
                 if (!note.isNullOrBlank()) {
@@ -205,7 +210,7 @@ fun JobRow(job: Job, node: NodeItem?, busy: Boolean, callbacks: JobCallbacks) {
 
 @Composable
 fun JobTile(job: Job, busy: Boolean, callbacks: JobCallbacks) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors=androidx.compose.material3.CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
         Box {
             val thumbModifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f)
                 .let { if (job.isViewableMedia) it.clickable { callbacks.open(job) } else it }
@@ -218,7 +223,10 @@ fun JobTile(job: Job, busy: Boolean, callbacks: JobCallbacks) {
             Text(job.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusBadge(job.status)
-                if (job.status.isActive) job.percent?.let { Text(Format.percent(it).orEmpty(), style = MaterialTheme.typography.labelMedium) }
+                if (job.status.isActive && job.ytdlpOptions?.playlist != true) job.percent?.let { Text(Format.jobProgress(job).orEmpty(), style = MaterialTheme.typography.labelMedium) }
+            }
+            if (job.status.isActive && job.ytdlpOptions?.playlist == true) Format.jobProgress(job)?.let {
+                Text(it,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             }
             if (job.status.isActive) {
                 job.percent?.let { percent ->

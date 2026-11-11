@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.mrcrubs.lms.android.AppContainer
+import ru.mrcrubs.lms.core.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.UUID
 import ru.mrcrubs.lms.core.CreateJobRequest
 import ru.mrcrubs.lms.core.LinkExtractor
 import ru.mrcrubs.lms.core.StorageTarget
@@ -45,6 +49,16 @@ data class AddUiState(
     val submitting: Boolean = false,
     val error: String? = null,
     val created: Boolean = false,
+    val media: MediaExtract? = null,
+    val mediaLoading: Boolean = false,
+    val mediaError: String? = null,
+    val selectedEntries: Set<String> = emptySet(),
+    val wholePlaylist: Boolean = true,
+    val maxHeight: Int? = null,
+    val entryHeights: Map<String,Int> = emptyMap(),
+    val routes: NetworkRoutes? = null,
+    val networkRouteId: String? = null,
+
 ) {
     val selectedNode: NodeChoice? get() = nodes.firstOrNull { it.id == selectedNodeId }
 
@@ -79,11 +93,15 @@ class AddDownloadViewModel(
     fun setUrl(value: String) {
         checkJob?.cancel()
         _state.update {
-            it.copy(url = value, checked = false, nodes = emptyList(), selectedNodeId = null, error = null, checking = false)
+            it.copy(url = value, media = null, mediaError = null, routes = null, selectedEntries = emptySet(), checked = false, nodes = emptyList(), selectedNodeId = null, error = null, checking = false)
         }
     }
 
-    fun setType(value: String) = _state.update { it.copy(type = value) }
+    fun setType(value: String) {
+        _state.update { it.copy(type=value) }
+        val state=_state.value
+        if(state.networkRouteId!=null && state.routes?.routes?.any{it.id==state.networkRouteId && value in it.supportedTypes}!=true)setNetworkRoute(null)
+    }
     fun setStoragePath(value: String) = _state.update { it.copy(storagePath = value) }
     fun setStartImmediately(value: Boolean) = _state.update { it.copy(startImmediately = value) }
     fun setSpeedLimit(value: Long?) = _state.update { it.copy(maxSpeedBytes = value) }
@@ -127,8 +145,9 @@ class AddDownloadViewModel(
             val keepPath = s.storagePath.isNotBlank() && s.storagePath != autoStoragePath
             val path = if (keepPath) s.storagePath else node.defaultStoragePath.orEmpty()
             if (!keepPath) autoStoragePath = path
-            s.copy(selectedNodeId = nodeId, type = type, storagePath = path, storageTargets = emptyList())
+            s.copy(selectedNodeId = nodeId, type = type, storagePath = path, storageTargets = emptyList(),routes=null,networkRouteId=null)
         }
+        loadRoutes(nodeId)
         storageJob?.cancel()
         storageJob = viewModelScope.launch {
             try {
@@ -148,22 +167,55 @@ class AddDownloadViewModel(
         }
     }
 
+    fun setMaxHeight(value: Int?) = _state.update { it.copy(maxHeight = value) }
+    fun setEntryHeight(url: String, value: Int) = _state.update { it.copy(entryHeights = it.entryHeights + (url to value)) }
+    fun setNetworkRoute(value: String?) {
+        _state.update { it.copy(networkRouteId=value) }
+        _state.value.selectedNodeId?.let{loadRoutes(it,value)}
+    }
+    fun setWholePlaylist(value: Boolean) = _state.update { it.copy(wholePlaylist = value) }
+    fun toggleEntry(url: String) = _state.update { it.copy(selectedEntries = if(url in it.selectedEntries) it.selectedEntries-url else it.selectedEntries+url) }
+    fun inspectMedia() { viewModelScope.launch {
+        val before = _state.value
+        if(before.selectedNodeId==null || before.mediaLoading)return@launch
+        _state.update { it.copy(mediaLoading = true, mediaError = null) }
+        try {
+            val result = withContext(Dispatchers.IO) { container.api()?.extractMedia(before.url,before.selectedNodeId,before.networkRouteId) ?: throw ApiException("Подключите LMS") }
+            if(_state.value.url==before.url&&_state.value.selectedNodeId==before.selectedNodeId) _state.update { it.copy(type="YTDLP",media=result,selectedEntries=result.entries.map { entry->entry.url }.toSet()) }
+        } catch(error: CancellationException){throw error}
+        catch(error:Exception){_state.update { it.copy(mediaError=error.message) }}
+        finally{_state.update { it.copy(mediaLoading=false) }}
+    } }
+    private fun loadRoutes(nodeId: String,selectedRoute:String?=null) { viewModelScope.launch {
+        val result = runCatching { withContext(Dispatchers.IO) { container.api()?.networkRoutes(nodeId,_state.value.url,selectedRoute) } }.getOrNull()
+        if(_state.value.selectedNodeId==nodeId&&_state.value.networkRouteId==selectedRoute)_state.update { it.copy(routes=result) }
+    } }
+
     fun submit() {
         val s = _state.value
         if (!s.canSubmit) return
         viewModelScope.launch {
             _state.update { it.copy(submitting = true, error = null) }
             try {
-                container.router.createJob(
-                    CreateJobRequest(
-                        type = s.type,
-                        url = s.url.trim(),
-                        storagePath = s.storagePath.trim().ifBlank { null },
-                        nodeId = s.selectedNodeId,
-                        startImmediately = s.startImmediately,
-                        maxSpeedBytes = s.maxSpeedBytes?.takeIf { it > 0 },
-                    ),
-                )
+                val media = s.media
+                val playlist = media?.takeIf { it.kind=="playlist" }
+                val batchId=UUID.randomUUID().toString()
+                val chosen = if(playlist!=null && !s.wholePlaylist) playlist.entries.filter { it.url in s.selectedEntries } else emptyList()
+                require(playlist==null || s.wholePlaylist || chosen.isNotEmpty()) { "Выберите хотя бы один ролик" }
+                val urls = if(playlist!=null && !s.wholePlaylist) chosen.map { it.url } else listOf(s.url.trim())
+                var completed=0
+                try { for(url in urls) {
+                    val index=playlist?.entries?.indexOfFirst { it.url==url }?.takeIf { it>=0 }?.plus(1)
+                    container.router.createJob(CreateJobRequest(
+                        type=if(media!=null)"YTDLP" else s.type,url=url,
+                        storagePath=s.storagePath.trim().ifBlank { null },nodeId=s.selectedNodeId,
+                        startImmediately=s.startImmediately,maxSpeedBytes=s.maxSpeedBytes?.takeIf { it>0 },networkRouteId=s.networkRouteId,
+                        ytdlpOptions=if(media!=null)YtdlpOptions(playlist=playlist!=null&&s.wholePlaylist,maxHeight=s.entryHeights[url]?.takeIf { it>0 } ?: s.maxHeight)else null,
+                        playlist=playlist?.let { PlaylistSnapshot(batchId,it.url,it.title,it.thumbnail,it.entryCount,index,if(s.wholePlaylist)it.entries else null) },
+                    ))
+                    completed++
+                    _state.update { it.copy(selectedEntries=it.selectedEntries-url) }
+                } } catch(error:Exception) { throw ApiException("Добавлено $completed из ${urls.size}. ${error.message.orEmpty()}") }
                 _state.update { it.copy(submitting = false, created = true) }
             } catch (ex: CancellationException) {
                 throw ex

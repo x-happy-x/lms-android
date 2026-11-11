@@ -84,9 +84,9 @@ fun JobsScreen(
     var speed by remember { mutableStateOf<Job?>(null) }
     var cancel by remember { mutableStateOf<Job?>(null) }
 
-    val callbacks = remember(viewModel) {
+    val callbacks = remember(viewModel,state.canEdit) {
         JobCallbacks(
-            pause = viewModel::pause,
+            canEdit=state.canEdit,            pause = viewModel::pause,
             resume = viewModel::resume,
             retry = viewModel::retry,
             cancel = { cancel = it },
@@ -101,7 +101,7 @@ fun JobsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Загрузки") },
+                title = { Column { Text("ВАША БИБЛИОТЕКА",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary);Text("Загрузки",style=MaterialTheme.typography.headlineMedium) } },
                 actions = {
                     SortMenu(state.query.sort, viewModel::setSort)
                     GroupMenu(state.query.group, viewModel::setGroup)
@@ -112,7 +112,7 @@ fun JobsScreen(
             )
         },
         floatingActionButton = {
-            if (state.configured) {
+            if (state.configured && state.canEdit) {
                 ExtendedFloatingActionButton(
                     onClick = onAdd,
                     icon = { Icon(Icons.Filled.Add, contentDescription = null) },
@@ -127,7 +127,7 @@ fun JobsScreen(
                 EmptyState(
                     icon = Icons.Filled.Download,
                     title = "Роутер не настроен",
-                    text = "Укажите адрес веб-интерфейса LMS на роутере, например 192.168.1.1:8082.",
+                    text = "Укажите адрес веб-интерфейса LMS на роутере, например https://lms.crubs.crazedns.ru.",
                     action = { Button(onClick = onSettings) { Text("Открыть настройки") } },
                 )
                 return@Column
@@ -259,6 +259,8 @@ private fun GroupMenu(current: GroupKey, onSelect: (GroupKey) -> Unit) {
 private fun JobsList(state: MainUiState, callbacks: JobCallbacks, onAdd: () -> Unit, onReset: () -> Unit) {
     val groups = remember(state.jobs, state.query, state.nodes) { JobsView.apply(state.jobs, state.query, state.nodes) }
     val total = groups.sumOf { it.jobs.size }
+    val stacks = groups.flatMap { it.jobs }.filter { it.playlist!=null || it.ytdlpOptions?.playlist==true }.groupBy { it.playlist?.id ?: it.id }
+    val stackedIds=stacks.values.flatten().map { it.id }.toSet()
     if (state.loading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator() }
         return
@@ -266,7 +268,7 @@ private fun JobsList(state: MainUiState, callbacks: JobCallbacks, onAdd: () -> U
     val nodeById = remember(state.nodes) { state.nodes.associateBy { it.id } }
     // One grid for both modes keeps pull-to-refresh working on empty and short lists.
     LazyVerticalGrid(
-        columns = if (state.gridView) GridCells.Adaptive(160.dp) else GridCells.Fixed(1),
+        columns = if (state.gridView) GridCells.Adaptive(180.dp) else if(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp>=840)GridCells.Adaptive(380.dp) else GridCells.Fixed(1),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -291,7 +293,10 @@ private fun JobsList(state: MainUiState, callbacks: JobCallbacks, onAdd: () -> U
                 }
             }
         }
-        groups.forEach { group ->
+        stacks.forEach { (key,jobs) -> item(key="playlist-$key",span={GridItemSpan(maxLineSpan)}) { PlaylistStack(jobs,callbacks,state.busyJobIds,nodeById) } }
+        groups.forEach { originalGroup ->
+            val group=originalGroup.copy(jobs=originalGroup.jobs.filter { it.id !in stackedIds })
+            if(group.jobs.isEmpty())return@forEach
             if (group.label.isNotEmpty()) {
                 item(key = "header-${group.key}", span = { GridItemSpan(maxLineSpan) }) {
                     GroupHeader(group.label, group.jobs.size)

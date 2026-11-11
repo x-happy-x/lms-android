@@ -27,6 +27,7 @@ import ru.mrcrubs.lms.core.downloadFileName
 
 data class MainUiState(
     val configured: Boolean = true,
+    val canEdit: Boolean = true,
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val jobs: List<Job> = emptyList(),
@@ -51,6 +52,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
 
     private var polling: CoroutineJob? = null
     private var polls = 0
+    private var accountScope: String? = null
 
     init {
         viewModelScope.launch {
@@ -194,17 +196,22 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
 
     private suspend fun load(full: Boolean) {
         val settings = container.settings.current()
+        val scope=settings.routerUrl+"|"+settings.bearerToken.orEmpty()+"|"+settings.username+"|"+settings.password
+        if(scope!=accountScope) { accountScope=scope;_state.update { it.copy(jobs=emptyList(),nodes=emptyList(),profiles=emptyList(),loading=true,error=null) } }
+        _state.update { it.copy(canEdit=settings.accountRole in listOf("admin","editor") || settings.accountLogin==null) }
         if (!settings.isConfigured) {
             _state.update { it.copy(configured = false, loading = false, jobs = emptyList(), nodes = emptyList(), error = null) }
             return
         }
         try {
             val jobs = container.router.jobs(activeOnly = false)
+            if(scope!=accountScope)return
             _state.update { it.copy(jobs = jobs, configured = true, loading = false, error = null) }
             container.monitor.process(jobs)
             if (full || _state.value.nodes.isEmpty()) {
                 val nodes = container.router.nodes()
                 val profiles = container.router.profiles()
+                if(scope!=accountScope)return
                 _state.update { it.copy(nodes = nodes, profiles = profiles) }
             }
         } catch (ex: CancellationException) {

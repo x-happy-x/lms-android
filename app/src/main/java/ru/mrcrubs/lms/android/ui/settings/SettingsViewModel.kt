@@ -16,6 +16,8 @@ data class SettingsUiState(
     val loaded: Boolean = false,
     val form: AppSettings = AppSettings(),
     val testing: Boolean = false,
+    val accountBusy: Boolean = false,
+    val accountMessage: String? = null,
     val testResult: String? = null,
     val testOk: Boolean = false,
     val saved: Boolean = false,
@@ -45,7 +47,9 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(testing = true, testResult = null, error = null) }
             try {
-                val version = container.router.testConnection(config)
+                val saved = container.settings.current()
+                val sameRouter = RouterApi.normalizeBaseUrl(config.baseUrl) == RouterApi.normalizeBaseUrl(saved.routerUrl)
+                val version = container.router.testConnection(config.copy(bearerToken = if(sameRouter) saved.bearerToken else null))
                 _state.update { it.copy(testing = false, testOk = true, testResult = "Подключено, версия $version") }
             } catch (ex: CancellationException) {
                 throw ex
@@ -54,6 +58,44 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             }
         }
     }
+
+    fun loginAccount(open: (String) -> Unit) {
+
+        viewModelScope.launch {
+
+            _state.update { it.copy(accountBusy = true, accountMessage = null) }
+
+            try {
+
+                val form = _state.value.form
+
+                require(RouterApi.normalizeBaseUrl(form.routerUrl) != null) { "Укажите корректный адрес LMS" }
+
+                container.settings.update { form }
+
+                open(container.account.begin())
+
+            } catch (error: Exception) { _state.update { it.copy(accountMessage = error.message ?: "Не удалось открыть Account") } }
+
+            finally { _state.update { it.copy(accountBusy = false) } }
+
+        }
+
+    }
+
+    fun logoutAccount() { viewModelScope.launch {
+
+        _state.update { it.copy(accountBusy = true) }
+
+        try { container.account.logout() }
+
+        catch (error: Exception) { _state.update { it.copy(accountMessage = error.message) } }
+
+        finally { _state.update { it.copy(accountBusy = false) } }
+
+    } }
+
+
 
     fun save() {
         val form = _state.value.form

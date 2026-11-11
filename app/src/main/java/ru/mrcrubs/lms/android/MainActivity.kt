@@ -6,6 +6,24 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Shield
+import ru.mrcrubs.lms.android.ui.files.FilesScreen
+import ru.mrcrubs.lms.android.ui.network.NetworkScreen
+import ru.mrcrubs.lms.android.ui.common.MoreScreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
@@ -79,6 +97,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.data?.scheme == "lms" && intent.data?.host == "auth") {
+            container.completeAccount(intent.data.toString()); return
+        }
         // Links from other apps arrive through LinkReceiverActivity; ACTION_ADD_LINK carries them here.
         val link = when (intent?.action) {
             LinkReceiverActivity.ACTION_ADD_LINK -> intent.getStringExtra(LinkReceiverActivity.EXTRA_LINK)
@@ -91,6 +112,9 @@ class MainActivity : ComponentActivity() {
 private object Routes {
     const val JOBS = "jobs"
     const val MEDIA = "media"
+    const val FILES = "files"
+    const val NETWORK = "network"
+    const val MORE = "more"
     const val NODES = "nodes"
     const val PROFILES = "profiles"
     const val SETTINGS = "settings"
@@ -105,7 +129,9 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val TABS = listOf(
     Tab(Routes.JOBS, "Загрузки", Icons.Filled.Download),
+    Tab(Routes.FILES, "Файлы", Icons.Filled.Folder),
     Tab(Routes.MEDIA, "Медиа", Icons.Filled.PhotoLibrary),
+    Tab(Routes.NETWORK, "HomeNet", Icons.Filled.Shield),
     Tab(Routes.NODES, "Ноды", Icons.Filled.Dns),
     Tab(Routes.PROFILES, "Профили", Icons.Filled.Tune),
     Tab(Routes.SETTINGS, "Настройки", Icons.Filled.Settings),
@@ -118,6 +144,8 @@ private fun AppNavigation(container: AppContainer) {
     val snackbar = remember { SnackbarHostState() }
     val incoming by container.incomingLinks.collectAsStateWithLifecycle()
     val message by viewModel.messages.collectAsStateWithLifecycle()
+    val accountResult by container.accountResult.collectAsStateWithLifecycle()
+    LaunchedEffect(accountResult) { accountResult?.let { container.accountResult.value = null; viewModel.refresh(); snackbar.showSnackbar(it) } }
     val backStack by navController.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
 
@@ -158,13 +186,18 @@ private fun AppNavigation(container: AppContainer) {
         }
     }
 
+    BoxWithConstraints {
+    val wide = maxWidth >= 600.dp && maxHeight >= 480.dp
+    val compactTabs = TABS.filter { it.route in listOf(Routes.JOBS,Routes.FILES,Routes.MEDIA) } + Tab(Routes.MORE,"Ещё",Icons.Filled.GridView)
+    val currentTop = if(route in compactTabs.map{it.route})route else Routes.MORE
+    val topLevel = TABS.any { it.route==route } || route==Routes.MORE
     Scaffold(
         bottomBar = {
-            if (TABS.any { it.route == route }) {
+            if (topLevel && !wide) {
                 NavigationBar {
-                    TABS.forEach { tab ->
+                    compactTabs.forEach { tab ->
                         NavigationBarItem(
-                            selected = route == tab.route,
+                            selected = currentTop == tab.route,
                             onClick = { openTab(tab.route) },
                             icon = { Icon(tab.icon, contentDescription = null) },
                             label = { Text(tab.label, maxLines = 1) },
@@ -175,7 +208,12 @@ private fun AppNavigation(container: AppContainer) {
         },
         snackbarHost = { if (route != Routes.JOBS) SnackbarHost(snackbar) },
     ) { outer ->
-        Box(Modifier.padding(bottom = outer.calculateBottomPadding()).consumeWindowInsets(outer)) {
+        Row(Modifier.padding(bottom = outer.calculateBottomPadding()).consumeWindowInsets(androidx.compose.foundation.layout.PaddingValues(bottom=outer.calculateBottomPadding()))) {
+            if(wide && topLevel) NavigationRail(modifier=Modifier.fillMaxHeight().verticalScroll(rememberScrollState())) {
+                Text("LMS",style=androidx.compose.material3.MaterialTheme.typography.titleLarge,modifier=Modifier.padding(vertical=20.dp))
+                TABS.forEach { tab -> NavigationRailItem(selected=route==tab.route,onClick={openTab(tab.route)},icon={Icon(tab.icon,null)},label={Text(tab.label)}) }
+            }
+            Box(Modifier.weight(1f)) {
             NavHost(navController = navController, startDestination = Routes.JOBS) {
                 composable(Routes.JOBS) {
                     JobsScreen(
@@ -189,6 +227,9 @@ private fun AppNavigation(container: AppContainer) {
                 composable(Routes.MEDIA) {
                     MediaScreen(viewModel = viewModel, onOpen = { navController.navigate(Routes.viewer(it.id)) })
                 }
+                composable(Routes.FILES) { FilesScreen(container) }
+                composable(Routes.NETWORK) { NetworkScreen(container) }
+                composable(Routes.MORE) { MoreScreen(onOpen={openTab(it)}) }
                 composable(Routes.NODES) { NodesScreen(viewModel) }
                 composable(Routes.PROFILES) { ProfilesScreen(viewModel) }
                 composable(Routes.SETTINGS) { SettingsScreen(container = container, onBack = null) }
@@ -218,6 +259,8 @@ private fun AppNavigation(container: AppContainer) {
                     )
                 }
             }
+            }
         }
+    }
     }
 }

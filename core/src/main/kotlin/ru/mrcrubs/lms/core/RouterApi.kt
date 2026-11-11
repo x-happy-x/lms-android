@@ -24,6 +24,7 @@ data class RouterConfig(
     /** Optional HTTP Basic auth, e.g. when the router UI is published through a proxy with auth. */
     val username: String? = null,
     val password: String? = null,
+    val bearerToken: String? = null,
 )
 
 /**
@@ -89,9 +90,35 @@ class RouterApi(
     fun previewUrl(jobId: String): String = base.toString() + "api/ui/jobs/${encode(jobId)}/preview"
 
     /** Headers to add when another component (player, image loader, DownloadManager) fetches router URLs. */
-    fun authHeaders(): Map<String, String> =
-        if (config.username.isNullOrEmpty()) emptyMap()
-        else mapOf("Authorization" to Credentials.basic(config.username, config.password.orEmpty()))
+    fun authHeaders(): Map<String, String> = when {
+        !config.bearerToken.isNullOrBlank() -> mapOf("Authorization" to "Bearer ${config.bearerToken}")
+        !config.username.isNullOrEmpty() -> mapOf("Authorization" to Credentials.basic(config.username, config.password.orEmpty()))
+        else -> emptyMap()
+    }
+
+    /** Never attach a router credential to a remote CDN thumbnail. */
+    fun headersFor(url: String): Map<String, String> {
+        val target = url.toHttpUrlOrNull() ?: return emptyMap()
+        return if (target.scheme == base.scheme && target.host == base.host && target.port == base.port) authHeaders() else emptyMap()
+    }
+
+    fun authConfig(): AuthConfig = get("auth/config", AuthConfig.serializer())
+    fun authSession(): AuthSession = get("auth/session", AuthSession.serializer())
+    fun extractMedia(url: String, nodeId: String? = null, networkRouteId: String? = null): MediaExtract = post("media/extract", json.encodeToString(MediaRequest.serializer(), MediaRequest(url, nodeId, networkRouteId=networkRouteId)), MediaExtract.serializer())
+    fun mediaInfo(url: String, nodeId: String? = null, maxHeight: Int? = null, networkRouteId: String? = null): MediaInfo = post("media/info", json.encodeToString(MediaRequest.serializer(), MediaRequest(url, nodeId, maxHeight,networkRouteId)), MediaInfo.serializer())
+    fun prepareMedia(url: String, nodeId: String? = null, maxHeight: Int? = null, networkRouteId: String? = null): MediaPreview = post("media/preview",json.encodeToString(MediaRequest.serializer(),MediaRequest(url,nodeId,maxHeight,networkRouteId)),MediaPreview.serializer())
+    fun mediaStreamUrl(path: String): String {
+        val target=base.resolve(path) ?: throw ApiException("Некорректный адрес потока LMS")
+        require(target.scheme==base.scheme && target.host==base.host && target.port==base.port && target.encodedPath.startsWith("/api/ui/media/stream/")) { "Поток должен идти через LMS" }
+        return target.toString()
+    }
+    fun files(nodeId: String, root: String, path: String = ""): FileListing = get("nodes/${encode(nodeId)}/files?root=${encode(root)}&path=${encode(path)}", FileListing.serializer())
+    fun mutateFile(nodeId: String, operation: String, root: String, path: String, name: String? = null): String {
+        require(operation in setOf("mkdir","rename","delete"))
+        return post("nodes/${encode(nodeId)}/files/$operation",json.encodeToString(FileMutation.serializer(),FileMutation(root,path,name)),JsonObject.serializer())["path"]?.jsonPrimitive?.content.orEmpty()
+    }
+    fun nodeFileUrl(nodeId: String, root: String, path: String, inline: Boolean = false): String = base.toString()+"api/ui/nodes/${encode(nodeId)}/files/content?root=${encode(root)}&path=${encode(path)}"+(if(inline) "&inline=1" else "")
+    fun networkRoutes(nodeId: String, url: String? = null, networkRouteId: String? = null): NetworkRoutes = get("network/routes?nodeId=${encode(nodeId)}"+(url?.let { "&url=${encode(it)}" } ?: "")+(networkRouteId?.let { "&networkRouteId=${encode(it)}" } ?: ""), NetworkRoutes.serializer())
 
     fun nodes(enabledOnly: Boolean = false): List<NodeItem> =
         get("nodes?enabled=$enabledOnly", ListSerializer(NodeItem.serializer()))
@@ -114,9 +141,7 @@ class RouterApi(
         val url = (base.toString() + "api/ui/" + path).toHttpUrlOrNull()
             ?: throw ApiException("Некорректный путь: $path")
         val builder = Request.Builder().url(url).header("Accept", "application/json")
-        if (!config.username.isNullOrEmpty()) {
-            builder.header("Authorization", Credentials.basic(config.username, config.password.orEmpty()))
-        }
+        authHeaders().forEach { (name, value) -> builder.header(name, value) }
         return builder
     }
 
@@ -170,7 +195,7 @@ class RouterApi(
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .build()
 
         /**
