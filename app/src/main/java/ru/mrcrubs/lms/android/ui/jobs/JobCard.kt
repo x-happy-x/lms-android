@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -71,6 +72,7 @@ data class JobCallbacks(
     val editUrl: (Job) -> Unit,
     val move: (Job) -> Unit,
     val speed: (Job) -> Unit,
+    val network: (Job) -> Unit = {},
 )
 
 @Composable
@@ -152,6 +154,9 @@ private fun JobMenu(job: Job, callbacks: JobCallbacks) {
             if (callbacks.canEdit && job.status.isActive) {
                 val label = job.maxSpeedBytes?.takeIf { it > 0 }?.let { "Скорость: ${SpeedLimits.label(it)}" } ?: "Ограничить скорость"
                 MenuAction(label, Icons.Filled.Speed, close) { callbacks.speed(job) }
+            }
+            if (callbacks.canEdit && job.status.isActive && job.nodeId != null && job.type in listOf("DIRECT", "YTDLP", "ARIA2C")) {
+                MenuAction("Изменить маршрут", Icons.Filled.Route, close) { callbacks.network(job) }
             }
             if (callbacks.canEdit && job.status != JobStatus.DONE) MenuAction("Изменить ссылку", Icons.Filled.Edit, close) { callbacks.editUrl(job) }
             MenuAction("Копировать ссылку", Icons.Filled.ContentCopy, close) { clipboard.setText(AnnotatedString(job.url)) }

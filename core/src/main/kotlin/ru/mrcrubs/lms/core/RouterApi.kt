@@ -66,6 +66,13 @@ class RouterApi(
     fun setSpeedLimit(id: String, maxSpeedBytes: Long?): Job =
         post("jobs/${encode(id)}/speed", speedBody(maxSpeedBytes), Job.serializer())
 
+    /** Changes only this active job's route; the node validates it before restarting. */
+    fun setJobNetworkRoute(id: String, networkRouteId: String?): Job = post(
+        "jobs/${encode(id)}/network",
+        json.encodeToString(JsonObject.serializer(), JsonObject(mapOf("networkRouteId" to kotlinx.serialization.json.JsonPrimitive(networkRouteId.orEmpty())))),
+        Job.serializer(),
+    )
+
     fun moveJob(id: String, request: MoveJobRequest): Job =
         post("jobs/${encode(id)}/move", json.encodeToString(MoveJobRequest.serializer(), request), Job.serializer())
 

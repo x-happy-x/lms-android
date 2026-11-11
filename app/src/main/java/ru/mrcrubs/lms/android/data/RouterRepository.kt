@@ -47,6 +47,7 @@ class RouterRepository(private val settings: SettingsRepository) {
         call { storageTargets(nodeId, requiredBytes) }
     suspend fun createJob(request: CreateJobRequest): Job = call { createJob(request) }
     suspend fun setSpeedLimit(id: String, maxSpeedBytes: Long?): Job = call { setSpeedLimit(id, maxSpeedBytes) }
+    suspend fun setJobNetworkRoute(id: String, routeId: String?): Job = call { setJobNetworkRoute(id, routeId) }
 
     /** Adds a link without the add screen: router preflight, then the planned node and type. */
     suspend fun addQuickly(url: String, maxSpeedBytes: Long?): Pair<Job, JobPlan> = call {

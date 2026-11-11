@@ -52,4 +52,31 @@ class NativeFeaturesTest {
             assertThrows<IllegalArgumentException>{api.mutateFile("node","exec","/mnt/disk8tb","",null)}
         }
     }
+    @Test fun changingOneJobRouteUsesTypedJsonPreservesPausedResponseAndPropagatesRejections() {
+        MockWebServer().use { server ->
+            server.start()
+            val api = RouterApi(RouterConfig(server.url("/").toString(), bearerToken="fixture-token"))
+            server.enqueue(MockResponse().setBody("""{"id":"job1","status":"PAUSED","networkRouteId":"home-eu","networkRouteLabel":"Europe"}"""))
+            val updated = api.setJobNetworkRoute("job1", "home-eu")
+            assertEquals(JobStatus.PAUSED, updated.status)
+            assertEquals("Europe", updated.networkRouteLabel)
+            var request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/api/ui/jobs/job1/network", request.path)
+            assertEquals("Bearer fixture-token", request.getHeader("Authorization"))
+            assertEquals("""{"networkRouteId":"home-eu"}""", request.body.readUtf8())
+            server.enqueue(MockResponse().setBody("""{"id":"job1","status":"QUEUED"}"""))
+            api.setJobNetworkRoute("job1", null)
+            request = server.takeRequest()
+            assertEquals("""{"networkRouteId":""}""", request.body.readUtf8())
+            for(status in listOf(401,400)) {
+                server.enqueue(MockResponse().setResponseCode(status).setBody("""{"error":"Route change rejected"}"""))
+                val failure = assertThrows<ApiException> { api.setJobNetworkRoute("job1", "unavailable") }
+                assertEquals(status, failure.statusCode)
+                assertEquals("Route change rejected", failure.message)
+                request = server.takeRequest()
+                assertEquals("""{"networkRouteId":"unavailable"}""", request.body.readUtf8())
+            }
+        }
+    }
 }

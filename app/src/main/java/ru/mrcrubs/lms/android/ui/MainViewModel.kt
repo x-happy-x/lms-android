@@ -133,6 +133,28 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     fun setSpeedLimit(job: Job, maxSpeedBytes: Long?, onDone: () -> Unit) =
         jobAction(job, onDone) { container.router.setSpeedLimit(it, maxSpeedBytes) }
 
+    fun setNetworkRoute(job: Job, routeId: String?, onResult: (String?) -> Unit) {
+        if (!_state.value.canEdit || !job.status.isActive) {
+            onResult("Изменение маршрута доступно редактору для активной загрузки")
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(busyJobIds = it.busyJobIds + job.id) }
+            try {
+                val updated = container.router.setJobNetworkRoute(job.id, routeId)
+                _state.update { state -> state.copy(jobs = state.jobs.map { if(it.id == updated.id) updated else it }) }
+                onResult(null)
+                load(full = false)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                onResult(error.message ?: "Не удалось изменить маршрут")
+            } finally {
+                _state.update { it.copy(busyJobIds = it.busyJobIds - job.id) }
+            }
+        }
+    }
+
     fun move(job: Job, nodeId: String?, storagePath: String?, onDone: () -> Unit) = jobAction(job, onDone) {
         container.router.moveJob(it, MoveJobRequest(targetNodeId = nodeId, storagePath = storagePath?.trim()?.ifBlank { null }))
     }
