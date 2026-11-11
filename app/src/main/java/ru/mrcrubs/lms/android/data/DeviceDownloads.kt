@@ -30,6 +30,16 @@ class DeviceDownloads(private val context: Context) {
         return context.getSystemService(DownloadManager::class.java).enqueue(request)
     }
 
+    fun enqueueFile(name: String, url: String, api: RouterApi): Long {
+        val safeName = name.map { if(it in "\\/:*?\"<>|") '_' else it }.joinToString("").ifBlank { "download" }
+        val request = DownloadManager.Request(Uri.parse(url)).setTitle(safeName).setDescription("LMS · Файлы")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"LMS/$safeName")
+        else request.setDestinationInExternalFilesDir(context,Environment.DIRECTORY_DOWNLOADS,safeName)
+        api.headersFor(url).forEach { (key,value)-> request.addRequestHeader(key,value) }
+        return context.getSystemService(DownloadManager::class.java).enqueue(request)
+    }
+
     val locationHint: String
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Загрузки/LMS" else "папку приложения"
 }

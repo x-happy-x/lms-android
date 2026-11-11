@@ -147,6 +147,16 @@ fun AddDownloadScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if("YTDLP" in state.availableTypes && !state.isMagnet) {
+                    OutlinedButton(onClick=viewModel::inspectMedia,enabled=!state.mediaLoading,modifier=Modifier.fillMaxWidth()) {
+                        if(state.mediaLoading)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp) else Text("Найти видео и плейлист")
+                    }
+                    state.mediaError?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+                    state.media?.let { NativePlaylistPanel(it,state,viewModel) }
+                }
+                state.routes?.let { routes ->
+                    ru.mrcrubs.lms.android.ui.network.NetworkRoutePicker(routes,state.networkRouteId,state.type,viewModel::setNetworkRoute)
+                }
                 SectionTitle("Нода")
                 state.nodes.forEach { node ->
                     NodeRow(node, selected = node.id == state.selectedNodeId, onClick = { viewModel.selectNode(node.id) })

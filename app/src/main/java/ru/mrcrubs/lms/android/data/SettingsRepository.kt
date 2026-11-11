@@ -19,6 +19,9 @@ data class AppSettings(
     val routerUrl: String = "",
     val username: String = "",
     val password: String = "",
+    val bearerToken: String? = null,
+    val accountLogin: String? = null,
+    val accountRole: String? = null,
     val notificationsEnabled: Boolean = true,
     val backgroundIntervalMinutes: Int = DEFAULT_INTERVAL_MINUTES,
     val sort: String = "NEWEST",
@@ -35,6 +38,7 @@ data class AppSettings(
         baseUrl = routerUrl,
         username = username.ifBlank { null },
         password = password.ifBlank { null },
+        bearerToken = bearerToken,
     )
 
     companion object {
@@ -45,6 +49,14 @@ data class AppSettings(
 }
 
 class SettingsRepository(private val context: Context) {
+    val secure = SecureAccountStore(context)
+    fun credentials(): ru.mrcrubs.lms.core.AccountCredentials? = runCatching {
+        secure.read("session")?.let { ru.mrcrubs.lms.core.RouterApi.json.decodeFromString(ru.mrcrubs.lms.core.AccountCredentials.serializer(), it) }
+    }.getOrNull()?.takeIf { it.expiresAt > System.currentTimeMillis() }
+    suspend fun saveCredentials(value: ru.mrcrubs.lms.core.AccountCredentials?) {
+        secure.write("session", value?.let { ru.mrcrubs.lms.core.RouterApi.json.encodeToString(ru.mrcrubs.lms.core.AccountCredentials.serializer(), it) })
+        context.dataStore.edit { it[longPreferencesKey("account_revision")] = System.currentTimeMillis(); it.remove(Keys.STATUS_SNAPSHOT) }
+    }
     private object Keys {
         val ROUTER_URL = stringPreferencesKey("router_url")
         val USERNAME = stringPreferencesKey("username")
@@ -95,7 +107,10 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it.remove(Keys.STATUS_SNAPSHOT) }
     }
 
-    private fun Preferences.toSettings() = AppSettings(
+    private fun Preferences.toSettings(): AppSettings {
+        val account = credentials()?.takeIf { saved -> ru.mrcrubs.lms.core.RouterApi.normalizeBaseUrl(this[Keys.ROUTER_URL].orEmpty()).toString().trimEnd('/') == saved.router }
+        return AppSettings(
+        bearerToken = account?.token, accountLogin = account?.login, accountRole = account?.role,
         routerUrl = this[Keys.ROUTER_URL].orEmpty(),
         username = this[Keys.USERNAME].orEmpty(),
         password = this[Keys.PASSWORD].orEmpty(),
@@ -107,4 +122,5 @@ class SettingsRepository(private val context: Context) {
         quickAdd = this[Keys.QUICK_ADD] ?: false,
         defaultSpeedLimit = this[Keys.SPEED_LIMIT],
     )
+    }
 }

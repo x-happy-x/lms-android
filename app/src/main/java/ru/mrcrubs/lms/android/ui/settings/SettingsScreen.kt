@@ -51,6 +51,8 @@ import ru.mrcrubs.lms.android.ui.factory
 fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)?) {
     val viewModel: SettingsViewModel = viewModel(factory = factory { SettingsViewModel(container) })
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val currentSettings by container.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) viewModel.edit { it.copy(notificationsEnabled = false) }
@@ -90,16 +92,25 @@ fun SettingsScreen(container: AppContainer, onBack: (() -> Unit)?) {
                 value = form.routerUrl,
                 onValueChange = { value -> viewModel.edit { it.copy(routerUrl = value) } },
                 label = { Text("Адрес веб-интерфейса LMS") },
-                placeholder = { Text("192.168.1.1:8082") },
+                placeholder = { Text("https://lms.crubs.crazedns.ru") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
-                "API роутера без авторизации: вне дома используйте VPN или прокси с паролем (логин ниже).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            androidx.compose.material3.Card {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Аккаунт", style = MaterialTheme.typography.titleLarge)
+                    Text(currentSettings.accountLogin?.let { "$it · ${currentSettings.accountRole.orEmpty()}" }
+                        ?: "Войдите через Account в системном браузере. Пароль не передаётся приложению.", style = MaterialTheme.typography.bodyMedium)
+                    if (currentSettings.accountLogin == null) Button(
+                        enabled = !state.accountBusy && form.routerUrl.isNotBlank(),
+                        onClick = { viewModel.loginAccount { url -> context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) } },
+                    ) { Text("Войти через Account") }
+                    else OutlinedButton(enabled = !state.accountBusy, onClick = viewModel::logoutAccount) { Text("Выйти") }
+                    state.accountMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            }
+            Text("HTTP Basic для собственного прокси · необязательно", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(
                 value = form.username,
                 onValueChange = { value -> viewModel.edit { it.copy(username = value) } },

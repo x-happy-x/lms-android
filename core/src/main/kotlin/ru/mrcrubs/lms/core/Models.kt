@@ -19,6 +19,10 @@ enum class JobStatus {
 @Serializable
 data class Job(
     val id: String,
+    val playlist: PlaylistSnapshot? = null,
+    val ytdlpOptions: YtdlpOptions? = null,
+    val networkRouteId: String? = null,
+    val networkRouteLabel: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val startedAt: String? = null,
@@ -44,6 +48,7 @@ data class Job(
     /** Human-friendly title: output file name, else the last URL segment, else the URL. */
     val title: String
         get() {
+            playlist?.title?.takeIf { it.isNotBlank() }?.let { if (ytdlpOptions?.playlist == true) return it }
             outputPath?.substringAfterLast('/')?.takeIf { it.isNotBlank() }?.let { return it }
             LinkExtractor.displayName(url)?.let { return it }
             return url
@@ -163,4 +168,7 @@ data class CreateJobRequest(
     val startImmediately: Boolean = true,
     /** Download limit in bytes/s; null = unlimited. */
     val maxSpeedBytes: Long? = null,
+    val ytdlpOptions: YtdlpOptions? = null,
+    val playlist: PlaylistSnapshot? = null,
+    val networkRouteId: String? = null,
 )

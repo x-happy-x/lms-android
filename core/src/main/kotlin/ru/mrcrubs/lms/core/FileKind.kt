@@ -60,7 +60,7 @@ enum class FileKind(val label: String) {
 
 /** Finished photo/video the router can stream for viewing (and the node can preview). */
 val Job.isViewableMedia: Boolean
-    get() = status == JobStatus.DONE && outputPath != null &&
+    get() = status == JobStatus.DONE && outputPath != null && ytdlpOptions?.playlist != true &&
         FileKind.of(this).let { it == FileKind.VIDEO || it == FileKind.IMAGE }
 
 /** Has an output that can be downloaded to the device. */
@@ -70,5 +70,5 @@ val Job.hasOutput: Boolean get() = status == JobStatus.DONE && outputPath != nul
 val Job.downloadFileName: String
     get() {
         val name = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { id }
-        return if (type == LinkExtractor.TYPE_TORRENT && FileKind.extensionOf(name).isEmpty()) "$name.zip" else name
+        return if ((ytdlpOptions?.playlist == true && !name.endsWith(".zip",true)) || (type == LinkExtractor.TYPE_TORRENT && FileKind.extensionOf(name).isEmpty())) "$name.zip" else name
     }
